@@ -8,7 +8,7 @@ from get_embedding_function import get_embedding_function
 from langchain_chroma import Chroma
 
 CHROMA_PATH = "./RAG_Chatbot/chroma"
-DATA_PATH = "../my directory/RAG_Chatbot/data"
+DATA_PATH = "../RAG_Chatbot/data"
 
 def main():
     # Check if the database should be cleared (using the --reset flag).
