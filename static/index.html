@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chatbot</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: url('https://images.unsplash.com/photo-1563089145-599997674d42?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YWVzdGhldGljJTIwbmVvbnxlbnwwfHwwfHx8MA%3D%3D') no-repeat center center fixed;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+        }
+
+        .chat-container {
+            width: 75%;
+            max-width: 800px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        h1 {
+            font-size: 2em;
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .chat-input {
+            width: 96%;
+            padding: 15px;
+            font-size: 1.2em;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+        }
+
+        .chat-button {
+            padding: 10px 20px;
+            font-size: 1em;
+            color: #fff;
+            background-color: #4a90e2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .chat-button:hover {
+            background-color: #357abd;
+        }
+
+        .chat-button.loading {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+
+        .response {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        .response-block {
+            padding: 10px;
+            background-color: #e1f5fe;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .sources {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-start;
+        }
+
+        .source-box {
+            flex: 1 1 45%;
+            max-width: 45%;
+            padding: 10px;
+            margin: 5px;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .source-link {
+            color: #4a90e2;
+            text-decoration: none;
+            word-wrap: break-word;
+        }
+
+        .bot_logo {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chat-container">
+        <div class="bot_logo">
+            <img src="https://cdn-icons-png.flaticon.com/512/8943/8943377.png" alt="icon"
+                style="height: 50px; width: 50px; object-fit: contain;">
+        </div>
+        <h1>Insight Bot</h1>
+        <textarea id="query-input" class="chat-input" rows="4" placeholder="Ask something..."></textarea>
+        <button onclick="sendQuery()" class="chat-button">Send</button>
+        <div id="loading-indicator" style="display: none; text-align: center;">
+            <img src="https://media.giphy.com/media/3o6Zt3WkL2xJ8dFg7K/giphy.gif" alt="Loading..."
+                style="width: 50px; height: 50px;">
+        </div>
+
+        <div id="response-output" class="response">
+            <div id="query-response" class="response-block"></div>
+            <div id="sources-container" class="sources"></div>
+        </div>
+    </div>
+
+    <script>
+        async function sendQuery() {
+            const queryText = document.getElementById("query-input").value;
+            const sendButton = document.querySelector(".chat-button");
+
+            // Clear previous response output
+            document.getElementById("query-response").innerText = "";
+            document.getElementById("sources-container").innerHTML = "";
+
+            if (queryText.trim() === "") {
+                alert("Enter a valid query!");
+                return;
+            }
+
+            try {
+                // Change button text to 'Loading'
+                sendButton.innerText = "Loading";
+                sendButton.disabled = true;
+
+                const response = await fetch("/query", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ query_text: queryText })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch response from server.");
+                }
+
+                const result = await response.json();
+                console.log("Response Result:", result); // Debugging log
+
+                document.getElementById("query-response").innerText = result.response;
+
+                // Check if sources exist and are in the expected format
+                if (result.sources && Array.isArray(result.sources) && result.sources.length > 0) {
+                    console.log("Sources Array:", result.sources); // Debugging log
+
+                    result.sources.forEach(source => {
+                        // Try matching the new format of sources array strings
+                        const match = source.match(/TempChatBot\\data\\(.*?)\.pdf/);
+                        if (match) {
+                            const pdfFileName = match[1] + '.pdf'; // Extracted filename only
+                            const httpLink = `http://127.0.0.1:8000/file/${pdfFileName}`;
+
+                            const sourceDiv = document.createElement("div");
+                            sourceDiv.className = "source-box";
+
+                            const link = document.createElement("a");
+                            link.href = httpLink;
+                            link.target = "_blank";
+                            link.className = "source-link";
+                            link.innerText = pdfFileName;
+
+                            sourceDiv.appendChild(link);
+                            document.getElementById("sources-container").appendChild(sourceDiv);
+                        } else {
+                            console.log("Source format did not match expected pattern:", source); // Debugging log
+                        }
+                    });
+                } else {
+                    console.log("No sources available or sources format is incorrect."); // Debugging log
+                }
+            } catch (error) {
+                document.getElementById("query-response").innerText = "Error: " + error.message;
+            } finally {
+                sendButton.innerText = "Send";
+                sendButton.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>
